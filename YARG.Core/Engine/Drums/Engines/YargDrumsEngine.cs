@@ -104,6 +104,13 @@ namespace YARG.Core.Engine.Drums.Engines
                 // For drums, each note in the chord are treated separately
                 foreach (var note in parentNote.AllNotes)
                 {
+                    // With a wide kick window, the rest of a chord times out before its kick does.
+                    // Those notes are already dealt with; the chord stays current for the kick.
+                    if (HasWideKickWindow && note.WasMissed)
+                    {
+                        continue;
+                    }
+
                     // Miss out the back end
                     if (!IsNoteInWindow(note, out bool missed))
                     {
@@ -113,9 +120,15 @@ namespace YARG.Core.Engine.Drums.Engines
                         if (isFirstNoteInWindow && missed)
                         {
                             // If one of the notes in the chord was missed out the back end,
-                            // that means all of them would miss.
+                            // that means all of them would miss (other than a kick with a wider window).
                             foreach (var missedNote in parentNote.AllNotes)
                             {
+                                if (HasWideKickWindow &&
+                                    (missedNote.WasHit || missedNote.WasMissed || IsNoteInWindow(missedNote)))
+                                {
+                                    continue;
+                                }
+
                                 // Intercept missed note while lane phrase is active and missed note is in forgiveness window
                                 if (AutohitNoteFromLane(missedNote))
                                 {
@@ -135,6 +148,20 @@ namespace YARG.Core.Engine.Drums.Engines
                                 }
                                 MissNote(missedNote);
                             }
+
+                            // The kick of this chord is still live, so keep going: this input may be
+                            // for it, or for a later note
+                            if (HasWideKickWindow && !parentNote.WasFullyHitOrMissed())
+                            {
+                                stopSkipping = false;
+                                continue;
+                            }
+                        }
+                        else if (HasWideKickWindow && !missed)
+                        {
+                            // The kick of this chord opens before its other notes do. Check the rest
+                            // of the chord, but nothing past it.
+                            continue;
                         }
 
                         break;

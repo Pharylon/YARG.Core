@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using YARG.Core.Chart;
 using YARG.Core.Input;
 using YARG.Core.Logging;
+using YARG.Core.Utility;
 
 namespace YARG.Core.Engine.Drums
 {
@@ -37,6 +38,12 @@ namespace YARG.Core.Engine.Drums
         protected int Kick;
 
         private int _wildcardMask;
+
+        /// <summary>
+        /// Whether kick notes have a wider hit window than the other notes (the Easy Kicks modifier).
+        /// When they do, the notes of a chord no longer open and close together.
+        /// </summary>
+        protected bool HasWideKickWindow => EngineParameters.KickHitWindowMultiplier > 1.0;
 
         protected DrumsEngine(InstrumentDifficulty<DrumNote> chart, SyncTrack syncTrack,
             DrumsEngineParameters engineParameters, bool isBot, bool isMidiDrumsInput)
@@ -396,6 +403,73 @@ namespace YARG.Core.Engine.Drums
                     QueueUpdateTime(KickLaneAutohitExpireTime, "Potential Lane Expiration Time");
                 }
             }
+
+            if (HasWideKickWindow)
+            {
+                QueueWideKickWindowUpdates(previousTime, nextTime);
+            }
+        }
+
+        // The base engine queues the window edges of each chord using the standard window.
+        // Kicks open earlier and close later than that, so their edges are queued here.
+        private void QueueWideKickWindowUpdates(double previousTime, double nextTime)
+        {
+            for (int i = NoteIndex; i < Notes.Count; i++)
+            {
+                var parentNote = Notes[i];
+
+                DrumNote? kick = null;
+                foreach (var note in parentNote.AllNotes)
+                {
+                    if (note.Pad == Kick)
+                    {
+                        kick = note;
+                        break;
+                    }
+                }
+
+                // The kick window is the widest there is, so if a kick here would not have opened
+                // yet, nothing from this point on has either
+                var (frontEnd, backEnd) = GetKickHitWindow(kick ?? parentNote);
+                double kickFrontEnd = parentNote.Time + frontEnd;
+                if (nextTime < kickFrontEnd)
+                {
+                    break;
+                }
+
+                if (kick is null || kick.WasHit || kick.WasMissed)
+                {
+                    continue;
+                }
+
+                // Bots hit on the note itself, which the base engine already queues
+                if (!IsBot && IsTimeBetween(kickFrontEnd, previousTime, nextTime))
+                {
+                    YargLogger.LogFormatTrace("Queuing kick {0} front end hit time at {1}", i, kickFrontEnd);
+                    QueueUpdateTime(kickFrontEnd, "Kick Front End");
+                }
+
+                // Same as the base engine: the kick is still hittable on the exact back end
+                double kickBackEnd = MathUtil.BitIncrement(parentNote.Time + backEnd);
+                if (IsTimeBetween(kickBackEnd, previousTime, nextTime))
+                {
+                    YargLogger.LogFormatTrace("Queuing kick {0} back end miss time at {1}", i, kickBackEnd);
+                    QueueUpdateTime(kickBackEnd, "Kick Back End");
+                }
+            }
+        }
+
+        protected override (double FrontEnd, double BackEnd) GetNoteHitWindow(DrumNote note)
+        {
+            return note.Pad == Kick ? GetKickHitWindow(note) : base.GetNoteHitWindow(note);
+        }
+
+        private (double FrontEnd, double BackEnd) GetKickHitWindow(DrumNote note)
+        {
+            var (frontEnd, backEnd) = base.GetNoteHitWindow(note);
+            double multiplier = EngineParameters.KickHitWindowMultiplier;
+
+            return (frontEnd * multiplier, backEnd * multiplier);
         }
 
         protected override void MissNote(DrumNote note)

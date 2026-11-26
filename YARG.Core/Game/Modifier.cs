@@ -18,7 +18,8 @@ namespace YARG.Core.Game
         NoDynamics    = 1 << 8,
         NoVocalPercussion = 1 << 9,
         RangeCompress = 1 << 10,
-        OpensToGreens = 1 << 11
+        OpensToGreens = 1 << 11,
+        EasyKicks     = 1 << 12
     }
 
     public static class ModifierConflicts
@@ -35,6 +36,10 @@ namespace YARG.Core.Game
             Modifier.AllTaps     |
             Modifier.HoposToTaps |
             Modifier.TapsToHopos,
+
+            // Widening the kick window is meaningless once the kicks are gone
+            Modifier.NoKicks |
+            Modifier.EasyKicks,
         };
 
         // Returns two modifier sets. The first set ("possible" modifiers) represents modifiers that should be
@@ -83,7 +88,8 @@ namespace YARG.Core.Game
                 GameMode.FiveLaneDrums or
                 GameMode.EliteDrums =>
                     Modifier.NoKicks    |
-                    Modifier.NoDynamics,
+                    Modifier.NoDynamics |
+                    Modifier.EasyKicks,
 
                 GameMode.Vocals =>
                     Modifier.UnpitchedOnly |

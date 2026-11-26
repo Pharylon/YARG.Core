@@ -1384,6 +1384,17 @@ namespace YARG.Core.Engine
             return score;
         }
 
+        /// <summary>
+        /// The hit window of a single note, as offsets from the note's time (the front end is negative).
+        /// </summary>
+        protected virtual (double FrontEnd, double BackEnd) GetNoteHitWindow(TNoteType note)
+        {
+            double hitWindow = EngineParameters.HitWindow.CalculateHitWindow(GetAverageNoteDistance(note));
+
+            return (EngineParameters.HitWindow.GetFrontEnd(hitWindow),
+                EngineParameters.HitWindow.GetBackEnd(hitWindow));
+        }
+
         protected bool IsNoteInWindow(TNoteType note) => IsNoteInWindow(note, out _);
 
         protected bool IsNoteInWindow(TNoteType note, double time) =>
@@ -1396,9 +1407,7 @@ namespace YARG.Core.Engine
         {
             missed = false;
 
-            double hitWindow = EngineParameters.HitWindow.CalculateHitWindow(GetAverageNoteDistance(note));
-            double frontend = EngineParameters.HitWindow.GetFrontEnd(hitWindow);
-            double backend = EngineParameters.HitWindow.GetBackEnd(hitWindow);
+            var (frontend, backend) = GetNoteHitWindow(note);
 
             // Time has not reached the front end of this note
             if (time < note.Time + frontend)

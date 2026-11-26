@@ -195,7 +195,12 @@ namespace YARG.Core.Game
                 };
             }
 
-            public DrumsEngineParameters Create(float[] starMultiplierThresholds, float[] soloBonusStarMultiplierThresholds, DrumsEngineParameters.DrumMode mode)
+            /// <param name="easyKicks">
+            /// Whether the player has the Easy Kicks modifier on. This comes from the profile rather than
+            /// the preset, but it changes how the engine judges notes, so it's part of the parameters.
+            /// </param>
+            public DrumsEngineParameters Create(float[] starMultiplierThresholds, float[] soloBonusStarMultiplierThresholds, DrumsEngineParameters.DrumMode mode,
+                bool easyKicks = false)
             {
                 var hitWindow = HitWindow.Create();
                 return new DrumsEngineParameters(
@@ -205,7 +210,8 @@ namespace YARG.Core.Game
                     soloBonusStarMultiplierThresholds,
                     mode,
                     NoStarPowerOverlap,
-                    EnableLanes);
+                    EnableLanes,
+                    easyKicks ? DrumsEngineParameters.EASY_KICKS_HIT_WINDOW_MULTIPLIER : 1.0);
             }
         }
 
